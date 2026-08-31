@@ -27,11 +27,12 @@
       <span class="badge tax" id="meta-imposto" title="Imposto do Meta Ads aplicado sobre o gasto bruto">imposto —</span>
       <div class="meta-item"><span class="meta-label">Período</span><span id="meta-periodo">—</span></div>
       <div class="meta-item"><span class="meta-label">Atualizado em</span><span id="meta-atualizado">—</span></div>
+      <button class="icon-btn" id="reload-btn" title="Buscar a última versão publicada dos dados">Atualizar</button>
       <button class="icon-btn" id="theme-btn" title="Alternar tema claro/escuro">Escuro</button>
     </div>
   </header>
 
-  <nav class="tabs" role="tablist">
+  <nav class="viewtabs" role="tablist">
     <button class="tab-btn is-active" id="tab-btn-geral" role="tab" aria-selected="true" aria-controls="tab-geral">Visão Geral</button>
     <button class="tab-btn" id="tab-btn-trafego" role="tab" aria-selected="false" aria-controls="tab-trafego">Tráfego Pago</button>
   </nav>
@@ -61,29 +62,36 @@
 
   <main id="tab-geral" class="tab-panel is-active" role="tabpanel" aria-labelledby="tab-btn-geral">
 
-    <section class="kpi-row" id="headline-tiles" aria-label="Indicadores principais"></section>
+    <section class="panel"><div class="health" id="health" aria-label="Saúde da mídia"></div></section>
+
+    <div class="hero" id="hero" aria-label="Investimento, leads e custo por lead"></div>
+    <p class="hero-line" id="heroLine"></p>
+
+    <div class="grid-funnel">
+      <section class="panel">
+        <h2>Funil completo</h2>
+        <p class="panel-hint">Impressões → Cliques (link) → Leads → Qualificados (MQL) → Vendas. Cada etapa mostra o volume e, à direita, o custo e a taxa de passagem.</p>
+        <div id="funnel" class="funnel" aria-label="Funil completo"></div>
+      </section>
+      <section class="panel">
+        <h2>Resultados por dia</h2>
+        <p class="panel-hint">Barras = Investimento c/ imposto (esq., R$) · linha = Leads (dir., nº).</p>
+        <div class="legend" id="legA"></div>
+        <div id="chA" class="chart-host"></div>
+
+        <h2 style="margin-top:20px">Leads × Custo por lead</h2>
+        <p class="panel-hint">Barras = Leads (esq., nº) · linha = Custo por lead (dir., R$).</p>
+        <div class="legend" id="legB"></div>
+        <div id="chB" class="chart-host"></div>
+      </section>
+    </div>
 
     <section class="panel">
-      <h2>Qualificação (MQL)</h2>
-      <div class="kpi-row" id="mql-tiles" aria-label="Qualificação de leads"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Funil completo</h2>
-      <p class="panel-hint">Impressões → Cliques (link) → Leads → Qualificados (MQL) → Vendas. Cada etapa mostra o volume e, à direita, o custo e a taxa de passagem.</p>
-      <div id="funnel" class="funnel" aria-label="Funil completo"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Resultados por dia</h2>
-      <p class="panel-hint">Barras = Investimento c/ imposto (esq., R$) · linha = Leads (dir., nº).</p>
-      <div class="legend" id="legA"></div>
-      <div id="chA" class="chart-host"></div>
-
-      <h2 style="margin-top:20px">Leads × Custo por lead</h2>
-      <p class="panel-hint">Barras = Leads (esq., nº) · linha = Custo por lead (dir., R$).</p>
-      <div class="legend" id="legB"></div>
-      <div id="chB" class="chart-host"></div>
+      <h2 id="metricTitle">Investimento por dia</h2>
+      <p class="panel-hint">Escolha a métrica. Com a comparação ligada, a linha tracejada é o período anterior alinhado dia a dia.</p>
+      <div class="tabs" id="metricTabs"></div>
+      <div class="legend" id="legend"></div>
+      <div id="chMetric" class="chart-host"></div>
     </section>
 
   </main>
@@ -91,6 +99,14 @@
   <main id="tab-trafego" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-trafego" hidden>
 
     <section class="kpi-row" id="cards-tiles" aria-label="Cards de mídia"></section>
+
+    <section class="panel">
+      <h2>Visão diária — principais métricas por dia</h2>
+      <p class="panel-hint">Uma linha por dia, mais recente no topo. Heatmap por coluna: <b style="color:var(--good-text)">verde = melhor</b>, <b style="color:var(--critical)">vermelho = pior</b> no período.</p>
+      <div class="table-scroll">
+        <table id="tabela-diaria" class="daily"></table>
+      </div>
+    </section>
 
     <section class="panel">
       <h2>Otimização — Campanha › Conjunto › Anúncio</h2>
