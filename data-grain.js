@@ -56,6 +56,20 @@
         "cpl":  null
     },
     {
+        "data":  "2026-08-31",
+        "campanha":  "RAL | E2-CAP | P2-FRIO | LEAD | CBO | 2026-08-28 | LAL",
+        "conjunto":  "AUTO | ALL | 25 a 54 | BR | LAL 1% Seguidores",
+        "anuncio":  "AD05-RAL-V2",
+        "investimento":  0.09,
+        "impressoes":  5,
+        "cliques":  0,
+        "leads":  0,
+        "cpm":  18,
+        "cpc":  0,
+        "ctr":  0,
+        "cpl":  null
+    },
+    {
         "data":  "2026-08-29",
         "campanha":  "RAL | E2-CAP | P2-FRIO | LEAD | CBO | 2026-08-28 | LAL",
         "conjunto":  "AUTO | ALL | 25 a 54 | BR | LAL 1% Seguidores",
@@ -115,15 +129,29 @@
         "data":  "2026-08-31",
         "campanha":  "RAL | E2-CAP | P2-FRIO | LEAD | CBO | 2026-08-28 | LAL",
         "conjunto":  "AUTO | ALL | 25 a 54 | BR | LAL 1% Seguidores",
+        "anuncio":  "AD04-RAL-V2",
+        "investimento":  0.32,
+        "impressoes":  8,
+        "cliques":  0,
+        "leads":  0,
+        "cpm":  40,
+        "cpc":  0,
+        "ctr":  0,
+        "cpl":  null
+    },
+    {
+        "data":  "2026-08-31",
+        "campanha":  "RAL | E2-CAP | P2-FRIO | LEAD | CBO | 2026-08-28 | LAL",
+        "conjunto":  "AUTO | ALL | 25 a 54 | BR | LAL 1% Seguidores",
         "anuncio":  "AD02-RAL-V1",
-        "investimento":  7.81,
-        "impressoes":  194,
-        "cliques":  4,
-        "leads":  1,
-        "cpm":  40.26,
-        "cpc":  1.95,
-        "ctr":  2.06,
-        "cpl":  7.81
+        "investimento":  31.58,
+        "impressoes":  833,
+        "cliques":  18,
+        "leads":  4,
+        "cpm":  37.91,
+        "cpc":  1.75,
+        "ctr":  2.16,
+        "cpl":  7.9
     },
     {
         "data":  "2026-08-28",
@@ -138,6 +166,20 @@
         "cpc":  2.52,
         "ctr":  1.28,
         "cpl":  20.14
+    },
+    {
+        "data":  "2026-08-31",
+        "campanha":  "RAL | E2-CAP | P2-FRIO | LEAD | CBO | 2026-08-28 | LAL",
+        "conjunto":  "AUTO | ALL | 25 a 54 | BR | LAL 1% Seguidores",
+        "anuncio":  "AD03-RAL-V1",
+        "investimento":  0.19,
+        "impressoes":  7,
+        "cliques":  0,
+        "leads":  0,
+        "cpm":  27.14,
+        "cpc":  0,
+        "ctr":  0,
+        "cpl":  null
     },
     {
         "data":  "2026-08-29",
