@@ -305,6 +305,10 @@ foreach ($r in $leadsRows) {
     $email = ''
     if ($idxLeadEmail -ge 0 -and $idxLeadEmail -lt $r.Length) { $email = $r[$idxLeadEmail].Trim().ToLowerInvariant() }
 
+    # Dedup por email: mesmo email aparecendo 2x na aba conta como 1 lead unico
+    # (mantem a primeira ocorrencia, na ordem da planilha).
+    if ($email.Length -gt 0 -and $leadEmails.Contains($email)) { continue }
+
     $leadsPeriodo.Add([pscustomobject]@{
         dia          = $dt.ToString('yyyy-MM-dd')
         utm_campaign = $utmCampaign

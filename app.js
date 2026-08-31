@@ -16,6 +16,8 @@
     return [x];
   }
 
+  function okNum(v) { return v !== null && v !== undefined && isFinite(v); }
+
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
     if (attrs) {
@@ -37,18 +39,24 @@
     return e;
   }
 
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
+    });
+  }
+
   function fmtInt(n) {
-    if (n === null || n === undefined) return '—';
+    if (!okNum(n)) return '—';
     return Math.round(n).toLocaleString('pt-BR');
   }
 
   function fmtCurrency(n) {
-    if (n === null || n === undefined) return '—';
+    if (!okNum(n)) return '—';
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
   function fmtPct(n, digits) {
-    if (n === null || n === undefined) return '—';
+    if (!okNum(n)) return '—';
     var d = digits || 1;
     return n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
   }
@@ -56,6 +64,11 @@
   function fmtDateShort(isoDay) {
     var parts = isoDay.split('-');
     return parts[2] + '/' + parts[1];
+  }
+
+  function fmtDateFull(isoDay) {
+    var parts = isoDay.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
   }
 
   // ---------------------------------------------------------------------
@@ -101,34 +114,6 @@
     return t;
   }
 
-  function aggregateGrainByAd(grain) {
-    var groups = {};
-    var order = [];
-    grain.forEach(function (g) {
-      var key = g.campanha + '␟' + g.conjunto + '␟' + g.anuncio;
-      if (!groups[key]) {
-        groups[key] = {
-          campanha: g.campanha, conjunto: g.conjunto, anuncio: g.anuncio,
-          investimento: 0, impressoes: 0, cliques: 0, leads: 0
-        };
-        order.push(key);
-      }
-      var row = groups[key];
-      row.investimento += g.investimento || 0;
-      row.impressoes += g.impressoes || 0;
-      row.cliques += g.cliques || 0;
-      row.leads += g.leads || 0;
-    });
-    return order.map(function (key) {
-      var row = groups[key];
-      row.cpm = row.impressoes > 0 ? (row.investimento / row.impressoes) * 1000 : 0;
-      row.cpc = row.cliques > 0 ? row.investimento / row.cliques : 0;
-      row.ctr = row.impressoes > 0 ? (row.cliques / row.impressoes) * 100 : 0;
-      row.cpl = row.leads > 0 ? row.investimento / row.leads : null;
-      return row;
-    }).sort(function (a, b) { return b.investimento - a.investimento; });
-  }
-
   // ---------------------------------------------------------------------
   // Stat tiles
   // ---------------------------------------------------------------------
@@ -143,7 +128,7 @@
 
   function renderHeadline(totals) {
     var host = document.getElementById('headline-tiles');
-    host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'número-verdade do funil'));
+    host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'número-verdade do funil, únicos por email'));
     host.appendChild(statTile('CPL', fmtCurrency(totals.cpl), 'investimento ÷ leads'));
     host.appendChild(statTile('Leads (pixel Meta)', fmtInt(totals.leads_pixel), 'referência — evento Lead'));
   }
@@ -167,213 +152,323 @@
   }
 
   // ---------------------------------------------------------------------
-  // Funil (ordinal, ramp: funnel-1/2/3)
+  // Funil completo (5 etapas): Impressoes -> Cliques -> Leads -> MQL -> Vendas
   // ---------------------------------------------------------------------
+  var STAGE_COLORS = [
+    { bg: '#86b6ef', ink: '#0b0b0b' },
+    { bg: '#5598e7', ink: '#0b0b0b' },
+    { bg: '#2a78d6', ink: '#ffffff' },
+    { bg: '#1c5cab', ink: '#ffffff' },
+    { bg: '#104281', ink: '#ffffff' }
+  ];
+
   function renderFunnel(totals) {
-    var host = document.getElementById('funnel-chart');
+    var host = document.getElementById('funnel');
+    var custoQualificado = totals.qualificados > 0 ? totals.investimento / totals.qualificados : null;
+    var custoVenda = totals.vendas > 0 ? totals.investimento / totals.vendas : null;
+    var leadVendaPct = totals.leads > 0 ? (totals.vendas / totals.leads) * 100 : 0;
+    var qualifVendaPct = totals.qualificados > 0 ? (totals.vendas / totals.qualificados) * 100 : 0;
+
     var stages = [
-      { etapa: 'Leads', valor: totals.leads },
-      { etapa: 'Qualificados', valor: totals.qualificados },
-      { etapa: 'Vendas', valor: totals.vendas }
+      { n: 'Impressões', v: fmtInt(totals.impressoes), cl: 'CPM', cv: fmtCurrency(totals.cpm), sub: 'CTR (link) <b>' + fmtPct(totals.ctr_link, 2) + '</b>' },
+      { n: 'Cliques (link)', v: fmtInt(totals.cliques), cl: 'CPC (link)', cv: fmtCurrency(totals.cpc), sub: 'Clique → Lead <b>' + fmtPct(totals.clique_lead_pct, 2) + '</b>' },
+      { n: 'Leads', v: fmtInt(totals.leads), cl: 'Custo / Lead', cv: fmtCurrency(totals.cpl), sub: 'Lead → Qualificado <b>' + fmtPct(totals.pct_qualificacao, 1) + '</b>' },
+      { n: 'Qualificados (MQL)', v: fmtInt(totals.qualificados), cl: 'Custo / Qualificado', cv: fmtCurrency(custoQualificado), sub: 'Qualificado → Venda <b>' + fmtPct(qualifVendaPct, 1) + '</b>' },
+      { n: 'Vendas', v: fmtInt(totals.vendas), cl: 'Custo / Venda (CAC)', cv: fmtCurrency(custoVenda), sub: 'Lead → Venda <b>' + fmtPct(leadVendaPct, 2) + '</b>' }
     ];
-    var W = 760, rowH = 56, gap = 14, labelW = 140, top = 6;
-    var H = top + stages.length * rowH + (stages.length - 1) * gap + 6;
-    var maxVal = Math.max.apply(null, stages.map(function (s) { return s.valor; })) || 1;
-    var barMaxW = W - labelW - 70;
 
-    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Funil de leads' });
-
-    stages.forEach(function (s, i) {
-      var y = top + i * (rowH + gap);
-      var w = Math.max(6, (s.valor / maxVal) * barMaxW);
-      var cls = 'funnel-bar-' + (i + 1);
-
-      var labelText = svgEl('text', { x: 0, y: y + rowH / 2 + 4, class: 'funnel-label' });
-      labelText.textContent = s.etapa;
-      svg.appendChild(labelText);
-
-      svg.appendChild(svgEl('rect', { x: labelW, y: y, width: w, height: rowH, rx: 6, class: cls }));
-
-      var valText = svgEl('text', { x: labelW + Math.max(w - 10, 30), y: y + rowH / 2 + 5, class: 'funnel-value', 'text-anchor': 'end' });
-      valText.textContent = fmtInt(s.valor);
-      svg.appendChild(valText);
-
-      if (i > 0) {
-        var prev = stages[i - 1].valor;
-        var pct = prev > 0 ? (s.valor / prev) * 100 : 0;
-        var dropText = svgEl('text', { x: labelW + w + 14, y: y + rowH / 2 + 4, class: 'funnel-drop' });
-        dropText.textContent = pct.toFixed(1).replace('.', ',') + '% do anterior';
-        svg.appendChild(dropText);
-      }
-    });
-
-    host.innerHTML = '';
-    host.appendChild(svg);
+    host.innerHTML = stages.map(function (s, i) {
+      var c = STAGE_COLORS[i];
+      return '<div class="fstage"><div class="fl" style="background:' + c.bg + ';color:' + c.ink + '">' +
+        '<div class="fn">' + esc(s.n) + '</div><div class="fv">' + s.v + '</div></div>' +
+        '<div class="fr"><div class="cl">' + esc(s.cl) + '</div><div class="cv">' + s.cv + '</div><div class="fsub">' + s.sub + '</div></div></div>';
+    }).join('');
   }
 
   // ---------------------------------------------------------------------
-  // Bar chart (single series, sequential blue)
+  // Grafico combinado: barra(s) + linha, com eixo duplo (esq/dir) e crosshair
   // ---------------------------------------------------------------------
-  function renderBarChart(hostId, series, valueKey, formatValue, labelSuffix) {
-    var host = document.getElementById(hostId);
-    var W = 520, H = 220, padL = 44, padB = 28, padT = 12, padR = 8;
-    var plotW = W - padL - padR, plotH = H - padT - padB;
-    var maxVal = Math.max.apply(null, series.map(function (d) { return d[valueKey]; })) || 1;
-    var n = series.length;
-    var slot = n > 0 ? plotW / n : plotW;
-    var barW = Math.max(4, Math.min(28, slot * 0.6));
+  function niceMax(v) {
+    if (!(v > 0)) return 1;
+    var e = Math.pow(10, Math.floor(Math.log10(v)));
+    var f = v / e;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e;
+  }
+  function ticksFor(max, n) {
+    n = n || 4;
+    var out = [];
+    for (var i = 0; i <= n; i++) out.push(max * i / n);
+    return out;
+  }
+  function labelStep(count, width) { return Math.max(1, Math.ceil(count / Math.max(2, Math.floor(width / 58)))); }
 
-    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img' });
+  function comboChart(host, rows, cfg) {
+    host.innerHTML = '';
+    var W = Math.max(300, host.clientWidth || 520), H = 240;
+    var P = { t: 22, r: 54, b: 28, l: 58 }, iw = W - P.l - P.r, ih = H - P.t - P.b, n = rows.length;
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, width: '100%', height: H, role: 'img' });
 
-    [0, 0.5, 1].forEach(function (t) {
-      var y = padT + plotH * (1 - t);
-      svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'gridline' }));
+    var leftVals = [];
+    rows.forEach(function (r) { cfg.bars.forEach(function (b) { leftVals.push(r[b.key] || 0); }); });
+    var leftMax = niceMax(Math.max.apply(null, leftVals.concat([0])));
+    var rightVals = rows.map(function (r) { return r[cfg.line.key]; }).filter(okNum);
+    var rightMax = niceMax(Math.max.apply(null, rightVals.concat([0])));
+    var yL = function (v) { return P.t + ih - (leftMax > 0 ? (v / leftMax) * ih : 0); };
+    var yR = function (v) { return P.t + ih - (rightMax > 0 ? (v / rightMax) * ih : 0); };
+
+    ticksFor(leftMax).forEach(function (t) {
+      var y = yL(t);
+      svg.appendChild(svgEl('line', { x1: P.l, x2: P.l + iw, y1: y, y2: y, class: 'gridline' }));
+      var tx = svgEl('text', { x: P.l - 7, y: y + 4, 'text-anchor': 'end', class: 'axis-label' });
+      tx.textContent = cfg.leftFmt(t);
+      svg.appendChild(tx);
     });
-    svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: padT + plotH, y2: padT + plotH, class: 'axis-line' }));
+    ticksFor(rightMax).forEach(function (t) {
+      var y = yR(t);
+      var tx = svgEl('text', { x: P.l + iw + 7, y: y + 4, 'text-anchor': 'start', class: 'axis-label' });
+      tx.textContent = cfg.rightFmt(t);
+      svg.appendChild(tx);
+    });
+    svg.appendChild(svgEl('line', { x1: P.l, x2: P.l + iw, y1: P.t + ih, y2: P.t + ih, class: 'axis-line' }));
 
-    series.forEach(function (d, i) {
-      var v = d[valueKey];
-      var h = maxVal > 0 ? (v / maxVal) * plotH : 0;
-      var x = padL + i * slot + (slot - barW) / 2;
-      var y = padT + plotH - h;
-
-      var rect = svgEl('rect', { x: x, y: y, width: barW, height: Math.max(h, 1), rx: 3, class: 'mark-blue' });
-      rect.addEventListener('mousemove', function (ev) {
-        showTooltip(ev.clientX, ev.clientY, fmtDateShort(d.data), [formatValue(v) + labelSuffix]);
+    var slot = n > 0 ? iw / n : iw, nb = cfg.bars.length;
+    var groupW = Math.min(slot - 3, nb > 1 ? 40 : 30), bw = Math.max(2, groupW / nb - 1), step = labelStep(n, iw);
+    rows.forEach(function (r, i) {
+      var cx = P.l + slot * i + slot / 2;
+      cfg.bars.forEach(function (b, bi) {
+        var v = r[b.key] || 0, h = Math.max(v > 0 ? 1.5 : 0, P.t + ih - yL(v));
+        var x = cx - groupW / 2 + bi * (groupW / nb) + (groupW / nb - bw) / 2;
+        if (h > 0) {
+          svg.appendChild(svgEl('rect', {
+            x: x, y: P.t + ih - h, width: bw, height: h, rx: Math.min(3, bw / 2),
+            style: 'fill:' + b.color
+          }));
+        }
       });
-      rect.addEventListener('mouseleave', hideTooltip);
-      svg.appendChild(rect);
-
-      if (n <= 8 || i === 0 || i === n - 1 || i === Math.floor(n / 2)) {
-        var lbl = svgEl('text', { x: x + barW / 2, y: padT + plotH + 16, class: 'axis-label', 'text-anchor': 'middle' });
-        lbl.textContent = fmtDateShort(d.data);
-        svg.appendChild(lbl);
+      if (i % step === 0 || i === n - 1) {
+        var tx = svgEl('text', { x: cx, y: H - 8, 'text-anchor': 'middle', class: 'axis-label' });
+        tx.textContent = fmtDateShort(r.data);
+        svg.appendChild(tx);
       }
     });
 
-    var maxLbl = svgEl('text', { x: 4, y: padT + 4, class: 'axis-label' });
-    maxLbl.textContent = formatValue(maxVal);
-    svg.appendChild(maxLbl);
-
-    host.innerHTML = '';
-    host.appendChild(svg);
-  }
-
-  // ---------------------------------------------------------------------
-  // Line chart (single series)
-  // ---------------------------------------------------------------------
-  function renderLineChart(hostId, series, valueKey, formatValue, labelSuffix) {
-    var host = document.getElementById(hostId);
-    var W = 520, H = 220, padL = 34, padB = 28, padT = 16, padR = 12;
-    var plotW = W - padL - padR, plotH = H - padT - padB;
-    var maxVal = Math.max.apply(null, series.map(function (d) { return d[valueKey]; })) || 1;
-    var n = series.length;
-    var stepX = n > 1 ? plotW / (n - 1) : 0;
-
-    function xy(i, v) {
-      var x = padL + i * stepX;
-      var y = padT + plotH - (maxVal > 0 ? (v / maxVal) * plotH : 0);
-      return [x, y];
+    var pts = rows.map(function (r, i) {
+      var v = r[cfg.line.key];
+      return okNum(v) ? [P.l + slot * i + slot / 2, yR(v)] : null;
+    });
+    var seg = [], segs = [];
+    pts.forEach(function (p) { if (p) seg.push(p); else if (seg.length) { segs.push(seg); seg = []; } });
+    if (seg.length) segs.push(seg);
+    segs.forEach(function (s) {
+      var d = s.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+      svg.appendChild(svgEl('path', {
+        d: d, style: 'fill:none;stroke:' + cfg.line.color + ';stroke-width:2;stroke-linejoin:round;stroke-linecap:round'
+      }));
+    });
+    if (n <= 45) {
+      pts.forEach(function (p) {
+        if (p) svg.appendChild(svgEl('circle', { cx: p[0], cy: p[1], r: 3.2, style: 'fill:' + cfg.line.color }));
+      });
     }
 
-    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img' });
-
-    [0, 0.5, 1].forEach(function (t) {
-      var y = padT + plotH * (1 - t);
-      svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'gridline' }));
+    var cross = svgEl('line', { class: 'chart-cross', y1: P.t, y2: P.t + ih });
+    svg.appendChild(cross);
+    var hit = svgEl('rect', { class: 'chart-hit', x: P.l, y: P.t, width: iw, height: ih });
+    hit.addEventListener('mousemove', function (ev) {
+      var box = svg.getBoundingClientRect();
+      var i = Math.max(0, Math.min(n - 1, Math.floor((((ev.clientX - box.left) / box.width) * W - P.l) / slot)));
+      var r = rows[i], cx = P.l + slot * i + slot / 2;
+      cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.style.opacity = 1;
+      var lines = [];
+      cfg.bars.forEach(function (b) { lines.push(b.name + ': ' + cfg.leftFmt(r[b.key] || 0)); });
+      lines.push(cfg.line.name + ': ' + cfg.lineFmt(r[cfg.line.key]));
+      showTooltip(ev.clientX, ev.clientY, fmtDateFull(r.data), lines);
     });
-    svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: padT + plotH, y2: padT + plotH, class: 'axis-line' }));
-
-    var pathD = series.map(function (d, i) {
-      var p = xy(i, d[valueKey]);
-      return (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
-    }).join(' ');
-    svg.appendChild(svgEl('path', { d: pathD, class: 'line-blue' }));
-
-    series.forEach(function (d, i) {
-      var p = xy(i, d[valueKey]);
-      svg.appendChild(svgEl('circle', { cx: p[0], cy: p[1], r: 3, class: 'dot-blue' }));
-
-      var hit = svgEl('circle', { cx: p[0], cy: p[1], r: 10, class: 'dot-hit' });
-      hit.addEventListener('mousemove', function (ev) {
-        showTooltip(ev.clientX, ev.clientY, fmtDateShort(d.data), [formatValue(d[valueKey]) + labelSuffix]);
-      });
-      hit.addEventListener('mouseleave', hideTooltip);
-      svg.appendChild(hit);
-
-      if (n <= 8 || i === 0 || i === n - 1 || i === Math.floor(n / 2)) {
-        var lbl = svgEl('text', { x: p[0], y: padT + plotH + 16, class: 'axis-label', 'text-anchor': 'middle' });
-        lbl.textContent = fmtDateShort(d.data);
-        svg.appendChild(lbl);
-      }
-    });
-
-    host.innerHTML = '';
+    hit.addEventListener('mouseleave', function () { cross.style.opacity = 0; hideTooltip(); });
+    svg.appendChild(hit);
     host.appendChild(svg);
   }
 
-  // ---------------------------------------------------------------------
-  // Heatmap table (agregado de GRAIN por campanha/conjunto/anuncio)
-  // ---------------------------------------------------------------------
-  function textColorForRamp(idx) {
-    return idx >= 7 ? '#ffffff' : '#0b0b0b';
+  function legendHTML(items) {
+    return items.map(function (it) {
+      return '<span><i style="background:' + it.color + '"></i>' + esc(it.name) + '</span>';
+    }).join('');
   }
 
-  function renderTabelaOtimizacao(rows) {
-    var table = document.getElementById('tabela-otimizacao');
+  function renderComboCharts(daily) {
+    document.getElementById('legA').innerHTML = legendHTML([
+      { name: 'Investimento c/ imposto', color: 'var(--series-blue)' },
+      { name: 'Leads (eixo dir.)', color: 'var(--series-2)' }
+    ]);
+    comboChart(document.getElementById('chA'), daily, {
+      bars: [{ key: 'investimento', color: 'var(--series-blue)', name: 'Investimento c/ imposto' }],
+      line: { key: 'leads', color: 'var(--series-2)', name: 'Leads' },
+      leftFmt: fmtCurrency, rightFmt: fmtInt, lineFmt: fmtInt
+    });
 
-    var thead = el('thead', null, [el('tr', null, [
-      el('th', { text: 'Campanha' }),
-      el('th', { text: 'Conjunto' }),
-      el('th', { text: 'Anúncio' }),
-      el('th', { text: 'Investimento' }),
-      el('th', { text: 'Impressões' }),
-      el('th', { text: 'Cliques' }),
-      el('th', { text: 'CPM' }),
-      el('th', { text: 'CPC' }),
-      el('th', { text: 'CTR' }),
-      el('th', { text: 'Leads' }),
-      el('th', { text: 'CPL' })
-    ])]);
+    document.getElementById('legB').innerHTML = legendHTML([
+      { name: 'Leads', color: 'var(--series-blue)' },
+      { name: 'Custo por lead (eixo dir.)', color: 'var(--series-2)' }
+    ]);
+    comboChart(document.getElementById('chB'), daily, {
+      bars: [{ key: 'leads', color: 'var(--series-blue)', name: 'Leads' }],
+      line: { key: 'cpl', color: 'var(--series-2)', name: 'Custo/lead' },
+      leftFmt: fmtInt, rightFmt: fmtCurrency, lineFmt: fmtCurrency
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Arvore Campanha > Conjunto > Anuncio (Otimizacao)
+  // ---------------------------------------------------------------------
+  var TREE_STATE = { expanded: {} };
+
+  var TCOLS = [
+    { k: 'label', label: 'Campanha › Conjunto › Anúncio' },
+    { k: 'investimento', label: 'Investimento', fmt: fmtCurrency },
+    { k: 'cpm', label: 'CPM', fmt: fmtCurrency, scale: 'low' },
+    { k: 'ctr', label: 'CTR (link)', fmt: function (v) { return fmtPct(v, 2); }, scale: 'high' },
+    { k: 'cpc', label: 'CPC (link)', fmt: fmtCurrency, scale: 'low' },
+    { k: 'cliques', label: 'Cliques (link)', fmt: fmtInt },
+    { k: 'leads', label: 'Leads', fmt: fmtInt, scale: 'high' },
+    { k: 'cpl', label: 'CPL', fmt: fmtCurrency, scale: 'low' }
+  ];
+
+  function tblank(label) { return { label: label, investimento: 0, impressoes: 0, cliques: 0, leads: 0, kids: {} }; }
+  function tderive(t) {
+    var o = {
+      label: t.label, investimento: t.investimento, impressoes: t.impressoes, cliques: t.cliques, leads: t.leads
+    };
+    o.cpm = t.impressoes > 0 ? (t.investimento / t.impressoes) * 1000 : 0;
+    o.ctr = t.impressoes > 0 ? (t.cliques / t.impressoes) * 100 : 0;
+    o.cpc = t.cliques > 0 ? t.investimento / t.cliques : 0;
+    o.cpl = t.leads > 0 ? t.investimento / t.leads : null;
+    return o;
+  }
+
+  function buildTree(grain) {
+    var root = {};
+    grain.forEach(function (g) {
+      var c = root[g.campanha] || (root[g.campanha] = tblank(g.campanha));
+      var s = c.kids[g.conjunto] || (c.kids[g.conjunto] = tblank(g.conjunto));
+      var a = s.kids[g.anuncio] || (s.kids[g.anuncio] = tblank(g.anuncio));
+      a.investimento += g.investimento || 0;
+      a.impressoes += g.impressoes || 0;
+      a.cliques += g.cliques || 0;
+      a.leads += g.leads || 0;
+    });
+    var RAW = ['investimento', 'impressoes', 'cliques', 'leads'];
+    function roll(node, key, level) {
+      var kids = Object.keys(node.kids).map(function (k) { return roll(node.kids[k], key + ' › ' + k, level + 1); });
+      var agg = tblank(node.label);
+      RAW.forEach(function (k) { agg[k] = node[k]; });
+      kids.forEach(function (c) { RAW.forEach(function (k) { agg[k] += c[k]; }); });
+      var d = tderive(agg);
+      d.key = key; d.level = level; d.kids = kids;
+      return d;
+    }
+    return Object.keys(root).map(function (k) { return roll(root[k], k, 0); });
+  }
+
+  function computeScales(camps) {
+    var scales = {};
+    TCOLS.filter(function (c) { return c.scale; }).forEach(function (c) {
+      var vals = camps.filter(function (r) { return r.investimento > 0 && okNum(r[c.k]); }).map(function (r) { return r[c.k]; });
+      if (vals.length > 1) scales[c.k] = { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), dir: c.scale };
+    });
+    return scales;
+  }
+
+  function shade(scales, k, v) {
+    var s = scales[k];
+    if (!s || !okNum(v) || s.max === s.min) return '';
+    var t = (v - s.min) / (s.max - s.min);
+    if (s.dir === 'low') t = 1 - t;
+    if (t < 0.15) return '';
+    var pct = Math.round(t * 32);
+    return 'background:color-mix(in srgb, var(--series-blue) ' + pct + '%, transparent)';
+  }
+
+  function sortNodes(list) { return list.slice().sort(function (a, b) { return b.investimento - a.investimento; }); }
+
+  function flattenTree(camps) {
+    var out = [];
+    sortNodes(camps).forEach(function (c) {
+      out.push(c);
+      if (TREE_STATE.expanded[c.key]) {
+        sortNodes(c.kids).forEach(function (s) {
+          out.push(s);
+          if (TREE_STATE.expanded[s.key]) sortNodes(s.kids).forEach(function (a) { out.push(a); });
+        });
+      }
+    });
+    return out;
+  }
+
+  function renderOtimizacao(grain) {
+    var table = document.getElementById('tabela-otimizacao');
+    var camps = buildTree(grain);
+    var scales = computeScales(camps);
+
+    var theadRow = el('tr', null, TCOLS.map(function (c) {
+      return el('th', c.k === 'label' ? { text: c.label } : { class: 'num', text: c.label });
+    }));
+    var thead = el('thead', null, [theadRow]);
 
     var tbody = el('tbody');
+    var rows = flattenTree(camps);
 
     if (rows.length === 0) {
-      tbody.appendChild(el('tr', null, [el('td', { class: 'empty-state', colspan: '11', text: 'Sem dados no período.' })]));
+      tbody.appendChild(el('tr', null, [el('td', { class: 'empty-state', colspan: String(TCOLS.length), text: 'Sem dados no período.' })]));
     } else {
-      var cplValues = rows.map(function (r) { return r.cpl; }).filter(function (v) { return v !== null && v !== undefined; });
-      var minCpl = cplValues.length ? Math.min.apply(null, cplValues) : 0;
-      var maxCpl = cplValues.length ? Math.max.apply(null, cplValues) : 0;
-
       rows.forEach(function (r) {
-        var cplText = r.cpl !== null && r.cpl !== undefined ? fmtCurrency(r.cpl) : 'sem lead';
-        var tr = el('tr', null, [
-          el('td', { text: r.campanha }),
-          el('td', { text: r.conjunto }),
-          el('td', { text: r.anuncio }),
-          el('td', { class: 'num', text: fmtCurrency(r.investimento) }),
-          el('td', { class: 'num', text: fmtInt(r.impressoes) }),
-          el('td', { class: 'num', text: fmtInt(r.cliques) }),
-          el('td', { class: 'num', text: fmtCurrency(r.cpm) }),
-          el('td', { class: 'num', text: fmtCurrency(r.cpc) }),
-          el('td', { class: 'num', text: fmtPct(r.ctr, 2) }),
-          el('td', { class: 'num', text: fmtInt(r.leads) })
-        ]);
-        var cplCell = el('td', { class: 'num', text: cplText });
-        if (r.cpl !== null && r.cpl !== undefined) {
-          var t = maxCpl === minCpl ? 0.5 : (r.cpl - minCpl) / (maxCpl - minCpl);
-          var idx = Math.round(t * (RAMP.length - 1));
-          cplCell.style.background = RAMP[idx];
-          cplCell.style.color = textColorForRamp(idx);
+        var canExpand = r.level < 2 && r.kids && r.kids.length > 0;
+        var isOpen = !!TREE_STATE.expanded[r.key];
+        var trClass = 'lv' + r.level + (canExpand ? ' exp' : '') + (isOpen ? ' open' : '');
+        var tr = el('tr', { class: trClass });
+
+        var caret = el('span', { class: 'caret', text: canExpand ? '▸' : '' });
+        var nmSpan = el('span', { class: 'nm' }, [caret, document.createTextNode(r.label)]);
+        var firstTd = el('td', null, [nmSpan]);
+        tr.appendChild(firstTd);
+
+        TCOLS.slice(1).forEach(function (c) {
+          var val = r[c.k];
+          var text = c.fmt(val);
+          var td = el('td', { class: 'num' });
+          var style = c.scale ? shade(scales, c.k, val) : '';
+          if (style) {
+            var span = el('span', { class: 'cell-scale', style: style, text: text });
+            td.appendChild(span);
+          } else {
+            td.textContent = text;
+          }
+          tr.appendChild(td);
+        });
+
+        if (canExpand) {
+          firstTd.addEventListener('click', function () {
+            TREE_STATE.expanded[r.key] = !TREE_STATE.expanded[r.key];
+            renderOtimizacao(grain);
+          });
         }
-        tr.appendChild(cplCell);
         tbody.appendChild(tr);
       });
     }
 
+    var totRaw = camps.reduce(function (t, r) {
+      t.investimento += r.investimento; t.impressoes += r.impressoes; t.cliques += r.cliques; t.leads += r.leads;
+      return t;
+    }, { investimento: 0, impressoes: 0, cliques: 0, leads: 0 });
+    var tot = tderive(totRaw);
+    var footRow = el('tr', null, [el('td', { text: 'Total — ' + camps.length + ' campanha(s)' })].concat(
+      TCOLS.slice(1).map(function (c) { return el('td', { class: 'num', text: c.fmt(tot[c.k]) }); })
+    ));
+    var tfoot = el('tfoot', null, [footRow]);
+
     table.innerHTML = '';
     table.appendChild(thead);
     table.appendChild(tbody);
+    table.appendChild(tfoot);
   }
 
   // ---------------------------------------------------------------------
@@ -402,8 +497,9 @@
   function renderError(message) {
     var page = document.querySelector('.page');
     page.innerHTML = '';
-    page.appendChild(el('div', { class: 'panel', html:
-      '<h2>Erro ao montar o dashboard</h2><p class="panel-hint">' + message + '</p>' }));
+    page.appendChild(el('div', {
+      class: 'panel', html: '<h2>Erro ao montar o dashboard</h2><p class="panel-hint">' + message + '</p>'
+    }));
   }
 
   function formatPeriodo(p) {
@@ -425,7 +521,7 @@
 
     try {
       var meta = window.META;
-      var daily = arr(window.DAILY);
+      var daily = arr(window.DAILY).slice().sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
       var grain = arr(window.GRAIN);
 
       document.getElementById('meta-periodo').textContent = formatPeriodo(meta.periodo);
@@ -433,15 +529,13 @@
       document.getElementById('foot-conta').textContent = meta.fontes.meta_conta;
 
       var totals = computeTotals(daily);
-      var tabelaRows = aggregateGrainByAd(grain);
 
       renderHeadline(totals);
       renderMql(totals);
       renderFunnel(totals);
+      renderComboCharts(daily);
       renderCards(totals);
-      renderBarChart('chart-investimento', daily, 'investimento', fmtCurrency, '');
-      renderLineChart('chart-leads', daily, 'leads', fmtInt, ' leads');
-      renderTabelaOtimizacao(tabelaRows);
+      renderOtimizacao(grain);
       initTabs();
     } catch (err) {
       renderError('Erro ao renderizar o dashboard: ' + err.message);

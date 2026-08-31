@@ -35,9 +35,21 @@
     </section>
 
     <section class="panel">
-      <h2>Funil</h2>
-      <p class="panel-hint">Leads → Qualificados → Vendas</p>
-      <div id="funnel-chart" class="chart-host" aria-label="Gráfico de funil"></div>
+      <h2>Funil completo</h2>
+      <p class="panel-hint">Impressões → Cliques (link) → Leads → Qualificados (MQL) → Vendas. Cada etapa mostra o volume e, à direita, o custo e a taxa de passagem.</p>
+      <div id="funnel" class="funnel" aria-label="Funil completo"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Resultados por dia</h2>
+      <p class="panel-hint">Barras = Investimento c/ imposto (esq., R$) · linha = Leads (dir., nº).</p>
+      <div class="legend" id="legA"></div>
+      <div id="chA" class="chart-host"></div>
+
+      <h2 style="margin-top:20px">Leads × Custo por lead</h2>
+      <p class="panel-hint">Barras = Leads (esq., nº) · linha = Custo por lead (dir., R$).</p>
+      <div class="legend" id="legB"></div>
+      <div id="chB" class="chart-host"></div>
     </section>
 
   </main>
@@ -46,22 +58,11 @@
 
     <section class="kpi-row" id="cards-tiles" aria-label="Cards de mídia"></section>
 
-    <section class="panel two-col">
-      <div>
-        <h2>Investimento diário</h2>
-        <div id="chart-investimento" class="chart-host" aria-label="Gráfico de investimento diário"></div>
-      </div>
-      <div>
-        <h2>Leads diário</h2>
-        <div id="chart-leads" class="chart-host" aria-label="Gráfico de leads diário"></div>
-      </div>
-    </section>
-
     <section class="panel">
       <h2>Otimização — Campanha › Conjunto › Anúncio</h2>
-      <p class="panel-hint">Cor de fundo do CPL indica custo por lead (mais escuro = mais caro)</p>
+      <p class="panel-hint">Clique numa campanha pra abrir os conjuntos, e num conjunto pra abrir os anúncios. Heatmap em CPM/CTR/CPC/CPL (mais forte = melhor).</p>
       <div class="table-scroll">
-        <table id="tabela-otimizacao" class="data-table"></table>
+        <table id="tabela-otimizacao" class="tree"></table>
       </div>
     </section>
 
