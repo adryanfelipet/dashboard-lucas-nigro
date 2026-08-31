@@ -1,0 +1,62 @@
+﻿window.DAILY = [
+    {
+        "data":  "2026-08-28",
+        "investimento":  48.41,
+        "impressoes":  1128,
+        "cliques":  29,
+        "leads_pixel":  52,
+        "leads":  3,
+        "qualificados":  3,
+        "vendas":  0,
+        "cpm":  42.92,
+        "cpc":  1.67,
+        "ctr_link":  2.57,
+        "cpl":  16.14,
+        "clique_lead_pct":  10.34
+    },
+    {
+        "data":  "2026-08-29",
+        "investimento":  52.56,
+        "impressoes":  1075,
+        "cliques":  29,
+        "leads_pixel":  8,
+        "leads":  2,
+        "qualificados":  2,
+        "vendas":  0,
+        "cpm":  48.89,
+        "cpc":  1.81,
+        "ctr_link":  2.7,
+        "cpl":  26.28,
+        "clique_lead_pct":  6.9
+    },
+    {
+        "data":  "2026-08-30",
+        "investimento":  79.54,
+        "impressoes":  1850,
+        "cliques":  47,
+        "leads_pixel":  39,
+        "leads":  8,
+        "qualificados":  2,
+        "vendas":  0,
+        "cpm":  42.99,
+        "cpc":  1.69,
+        "ctr_link":  2.54,
+        "cpl":  9.94,
+        "clique_lead_pct":  17.02
+    },
+    {
+        "data":  "2026-08-31",
+        "investimento":  4.28,
+        "impressoes":  90,
+        "cliques":  1,
+        "leads_pixel":  4,
+        "leads":  1,
+        "qualificados":  1,
+        "vendas":  0,
+        "cpm":  47.56,
+        "cpc":  4.28,
+        "ctr_link":  1.11,
+        "cpl":  4.28,
+        "clique_lead_pct":  100
+    }
+];
