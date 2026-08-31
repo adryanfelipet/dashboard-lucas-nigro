@@ -5,14 +5,14 @@
         "impressoes":  1128,
         "cliques":  29,
         "leads_pixel":  52,
-        "leads":  3,
-        "qualificados":  3,
+        "leads":  2,
+        "qualificados":  2,
         "vendas":  0,
         "cpm":  42.92,
         "cpc":  1.67,
         "ctr_link":  2.57,
-        "cpl":  16.14,
-        "clique_lead_pct":  10.34
+        "cpl":  24.2,
+        "clique_lead_pct":  6.9
     },
     {
         "data":  "2026-08-29",
@@ -46,17 +46,17 @@
     },
     {
         "data":  "2026-08-31",
-        "investimento":  4.41,
-        "impressoes":  95,
+        "investimento":  4.63,
+        "impressoes":  106,
         "cliques":  3,
         "leads_pixel":  4,
         "leads":  1,
         "qualificados":  1,
         "vendas":  0,
-        "cpm":  46.42,
-        "cpc":  1.47,
-        "ctr_link":  3.16,
-        "cpl":  4.41,
+        "cpm":  43.68,
+        "cpc":  1.54,
+        "ctr_link":  2.83,
+        "cpl":  4.63,
         "clique_lead_pct":  33.33
     }
 ];
