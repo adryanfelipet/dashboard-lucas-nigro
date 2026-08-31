@@ -3,32 +3,73 @@ name: Build & Deploy Dashboard RAL
 on:
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Build data.js (Meta Graph API + planilha)
-        shell: pwsh
+      - name: Configura identidade git
+        shell: powershell
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Build e publica data-*.js (git a prova de corrida)
+        shell: powershell
         env:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-        run: ./build.ps1
-
-      - name: Stage site
         run: |
-          mkdir -p _site
-          cp index.html app.js styles.css data.js _site/
+          $ErrorActionPreference = 'Stop'
+          $maxAttempts = 5
+          $pushed = $false
+
+          for ($i = 1; $i -le $maxAttempts; $i++) {
+            git fetch origin main
+            if ($LASTEXITCODE -ne 0) { throw "git fetch falhou" }
+
+            git reset --soft origin/main
+            if ($LASTEXITCODE -ne 0) { throw "git reset --soft falhou" }
+
+            ./build.ps1 -Mode all
+
+            git add -f data-meta.js data-daily.js data-grain.js
+            $changes = git status --porcelain -- data-meta.js data-daily.js data-grain.js
+            if ([string]::IsNullOrWhiteSpace($changes)) {
+              Write-Host "Sem mudancas nos dados - nada novo para publicar."
+              $pushed = $true
+              break
+            }
+
+            git commit -m "Atualiza dados RAL"
+            if ($LASTEXITCODE -ne 0) { throw "git commit falhou" }
+
+            git push origin HEAD:main
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Push ok na tentativa $i"
+              $pushed = $true
+              break
+            }
+            Write-Warning "Push rejeitado na tentativa $i (provavel corrida) - tentando de novo..."
+          }
+
+          if (-not $pushed) { throw "Nao foi possivel publicar apos $maxAttempts tentativas" }
+
+      - name: Monta _site (somente arquivos publicos)
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path _site | Out-Null
+          Copy-Item -Path index.html,app.js,styles.css,data-meta.js,data-daily.js,data-grain.js -Destination _site
+          New-Item -ItemType File -Force -Path _site/.nojekyll | Out-Null
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -38,6 +79,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -8,6 +8,14 @@
     '#184f95', '#104281', '#0d366b'
   ];
 
+  // PS 5.1 (ConvertTo-Json) as vezes colapsa array de 1 item em escalar.
+  // arr() normaliza qualquer valor de window.DAILY/window.GRAIN para array.
+  function arr(x) {
+    if (Array.isArray(x)) return x;
+    if (x === null || x === undefined) return [];
+    return [x];
+  }
+
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
     if (attrs) {
@@ -41,7 +49,8 @@
 
   function fmtPct(n, digits) {
     if (n === null || n === undefined) return '—';
-    return n.toLocaleString('pt-BR', { minimumFractionDigits: digits || 1, maximumFractionDigits: digits || 1 }) + '%';
+    var d = digits || 1;
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
   }
 
   function fmtDateShort(isoDay) {
@@ -67,6 +76,60 @@
   function hideTooltip() { tooltipEl.hidden = true; }
 
   // ---------------------------------------------------------------------
+  // Agregacao client-side a partir de DAILY[] / GRAIN[]
+  // ---------------------------------------------------------------------
+  function computeTotals(daily) {
+    var t = {
+      investimento: 0, impressoes: 0, cliques: 0, leads_pixel: 0,
+      leads: 0, qualificados: 0, vendas: 0
+    };
+    daily.forEach(function (d) {
+      t.investimento += d.investimento || 0;
+      t.impressoes += d.impressoes || 0;
+      t.cliques += d.cliques || 0;
+      t.leads_pixel += d.leads_pixel || 0;
+      t.leads += d.leads || 0;
+      t.qualificados += d.qualificados || 0;
+      t.vendas += d.vendas || 0;
+    });
+    t.cpm = t.impressoes > 0 ? (t.investimento / t.impressoes) * 1000 : 0;
+    t.cpc = t.cliques > 0 ? t.investimento / t.cliques : 0;
+    t.ctr_link = t.impressoes > 0 ? (t.cliques / t.impressoes) * 100 : 0;
+    t.cpl = t.leads > 0 ? t.investimento / t.leads : null;
+    t.clique_lead_pct = t.cliques > 0 ? (t.leads / t.cliques) * 100 : 0;
+    t.pct_qualificacao = t.leads > 0 ? (t.qualificados / t.leads) * 100 : 0;
+    return t;
+  }
+
+  function aggregateGrainByAd(grain) {
+    var groups = {};
+    var order = [];
+    grain.forEach(function (g) {
+      var key = g.campanha + '␟' + g.conjunto + '␟' + g.anuncio;
+      if (!groups[key]) {
+        groups[key] = {
+          campanha: g.campanha, conjunto: g.conjunto, anuncio: g.anuncio,
+          investimento: 0, impressoes: 0, cliques: 0, leads: 0
+        };
+        order.push(key);
+      }
+      var row = groups[key];
+      row.investimento += g.investimento || 0;
+      row.impressoes += g.impressoes || 0;
+      row.cliques += g.cliques || 0;
+      row.leads += g.leads || 0;
+    });
+    return order.map(function (key) {
+      var row = groups[key];
+      row.cpm = row.impressoes > 0 ? (row.investimento / row.impressoes) * 1000 : 0;
+      row.cpc = row.cliques > 0 ? row.investimento / row.cliques : 0;
+      row.ctr = row.impressoes > 0 ? (row.cliques / row.impressoes) * 100 : 0;
+      row.cpl = row.leads > 0 ? row.investimento / row.leads : null;
+      return row;
+    }).sort(function (a, b) { return b.investimento - a.investimento; });
+  }
+
+  // ---------------------------------------------------------------------
   // Stat tiles
   // ---------------------------------------------------------------------
   function statTile(label, value, sub) {
@@ -78,38 +141,41 @@
     return el('div', { class: 'stat-tile' }, children);
   }
 
-  function renderHeadline(data) {
+  function renderHeadline(totals) {
     var host = document.getElementById('headline-tiles');
-    host.appendChild(statTile('Leads (planilha)', fmtInt(data.headline.leads), 'número-verdade do funil'));
-    host.appendChild(statTile('CPL', fmtCurrency(data.headline.cpl), 'investimento ÷ leads'));
-    host.appendChild(statTile('Leads (pixel Meta)', fmtInt(data.headline.leads_pixel), 'referência — evento Lead'));
+    host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'numero-verdade do funil'));
+    host.appendChild(statTile('CPL', fmtCurrency(totals.cpl), 'investimento ÷ leads'));
+    host.appendChild(statTile('Leads (pixel Meta)', fmtInt(totals.leads_pixel), 'referencia — evento Lead'));
   }
 
-  function renderMql(data) {
+  function renderMql(totals) {
     var host = document.getElementById('mql-tiles');
-    host.appendChild(statTile('Qualificados', fmtInt(data.mql.qualificados)));
-    host.appendChild(statTile('% Qualificação', fmtPct(data.mql.pct_qualificacao), 'qualificados ÷ leads'));
+    host.appendChild(statTile('Qualificados', fmtInt(totals.qualificados)));
+    host.appendChild(statTile('% Qualificacao', fmtPct(totals.pct_qualificacao), 'qualificados ÷ leads'));
   }
 
-  function renderCards(data) {
+  function renderCards(totals) {
     var host = document.getElementById('cards-tiles');
-    var c = data.cards;
-    host.appendChild(statTile('Investimento', fmtCurrency(c.investimento), 'com imposto (×1,1385)'));
-    host.appendChild(statTile('CPM', fmtCurrency(c.cpm)));
-    host.appendChild(statTile('CTR (link)', fmtPct(c.ctr_link, 2)));
-    host.appendChild(statTile('CPC', fmtCurrency(c.cpc)));
-    host.appendChild(statTile('Cliques', fmtInt(c.cliques), 'cliques no link'));
-    host.appendChild(statTile('Leads', fmtInt(c.leads)));
-    host.appendChild(statTile('CPL', fmtCurrency(c.cpl)));
-    host.appendChild(statTile('Clique → Lead', fmtPct(c.clique_lead_pct, 2)));
+    host.appendChild(statTile('Investimento', fmtCurrency(totals.investimento), 'com imposto (x1,1385)'));
+    host.appendChild(statTile('CPM', fmtCurrency(totals.cpm)));
+    host.appendChild(statTile('CTR (link)', fmtPct(totals.ctr_link, 2)));
+    host.appendChild(statTile('CPC', fmtCurrency(totals.cpc)));
+    host.appendChild(statTile('Cliques', fmtInt(totals.cliques), 'cliques no link'));
+    host.appendChild(statTile('Leads', fmtInt(totals.leads)));
+    host.appendChild(statTile('CPL', fmtCurrency(totals.cpl)));
+    host.appendChild(statTile('Clique → Lead', fmtPct(totals.clique_lead_pct, 2)));
   }
 
   // ---------------------------------------------------------------------
   // Funil (ordinal, ramp: funnel-1/2/3)
   // ---------------------------------------------------------------------
-  function renderFunnel(data) {
+  function renderFunnel(totals) {
     var host = document.getElementById('funnel-chart');
-    var stages = data.funil;
+    var stages = [
+      { etapa: 'Leads', valor: totals.leads },
+      { etapa: 'Qualificados', valor: totals.qualificados },
+      { etapa: 'Vendas', valor: totals.vendas }
+    ];
     var W = 760, rowH = 56, gap = 14, labelW = 140, top = 6;
     var H = top + stages.length * rowH + (stages.length - 1) * gap + 6;
     var maxVal = Math.max.apply(null, stages.map(function (s) { return s.valor; })) || 1;
@@ -122,11 +188,12 @@
       var w = Math.max(6, (s.valor / maxVal) * barMaxW);
       var cls = 'funnel-bar-' + (i + 1);
 
-      svg.appendChild(svgEl('text', { x: 0, y: y + rowH / 2 + 4, class: 'funnel-label' }))
-        .textContent = s.etapa;
-      svg.appendChild(svgEl('rect', {
-        x: labelW, y: y, width: w, height: rowH, rx: 6, class: cls
-      }));
+      var labelText = svgEl('text', { x: 0, y: y + rowH / 2 + 4, class: 'funnel-label' });
+      labelText.textContent = s.etapa;
+      svg.appendChild(labelText);
+
+      svg.appendChild(svgEl('rect', { x: labelW, y: y, width: w, height: rowH, rx: 6, class: cls }));
+
       var valText = svgEl('text', { x: labelW + Math.max(w - 10, 30), y: y + rowH / 2 + 5, class: 'funnel-value', 'text-anchor': 'end' });
       valText.textContent = fmtInt(s.valor);
       svg.appendChild(valText);
@@ -145,7 +212,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // Bar chart (single series, sequential blue) — investimento diário
+  // Bar chart (single series, sequential blue)
   // ---------------------------------------------------------------------
   function renderBarChart(hostId, series, valueKey, formatValue, labelSuffix) {
     var host = document.getElementById(hostId);
@@ -153,7 +220,7 @@
     var plotW = W - padL - padR, plotH = H - padT - padB;
     var maxVal = Math.max.apply(null, series.map(function (d) { return d[valueKey]; })) || 1;
     var n = series.length;
-    var slot = plotW / n;
+    var slot = n > 0 ? plotW / n : plotW;
     var barW = Math.max(4, Math.min(28, slot * 0.6));
 
     var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img' });
@@ -193,7 +260,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // Line chart (single series) — leads diário
+  // Line chart (single series)
   // ---------------------------------------------------------------------
   function renderLineChart(hostId, series, valueKey, formatValue, labelSuffix) {
     var host = document.getElementById(hostId);
@@ -246,23 +313,14 @@
   }
 
   // ---------------------------------------------------------------------
-  // Heatmap table
+  // Heatmap table (agregado de GRAIN por campanha/conjunto/anuncio)
   // ---------------------------------------------------------------------
-  function rampColorForValue(value, min, max) {
-    if (value === null || value === undefined || max === min) return RAMP[0];
-    var t = (value - min) / (max - min);
-    t = Math.max(0, Math.min(1, t));
-    var idx = Math.round(t * (RAMP.length - 1));
-    return RAMP[idx];
-  }
-
   function textColorForRamp(idx) {
     return idx >= 7 ? '#ffffff' : '#0b0b0b';
   }
 
-  function renderTabelaOtimizacao(data) {
+  function renderTabelaOtimizacao(rows) {
     var table = document.getElementById('tabela-otimizacao');
-    var rows = data.tabela_otimizacao || [];
 
     var thead = el('thead', null, [el('tr', null, [
       el('th', { text: 'Campanha' }),
@@ -288,6 +346,7 @@
       var maxCpl = cplValues.length ? Math.max.apply(null, cplValues) : 0;
 
       rows.forEach(function (r) {
+        var cplText = r.cpl !== null && r.cpl !== undefined ? fmtCurrency(r.cpl) : 'sem lead';
         var tr = el('tr', null, [
           el('td', { text: r.campanha }),
           el('td', { text: r.conjunto }),
@@ -300,7 +359,7 @@
           el('td', { class: 'num', text: fmtPct(r.ctr, 2) }),
           el('td', { class: 'num', text: fmtInt(r.leads) })
         ]);
-        var cplCell = el('td', { class: 'num', text: r.cpl !== null && r.cpl !== undefined ? fmtCurrency(r.cpl) : 'sem lead' });
+        var cplCell = el('td', { class: 'num', text: cplText });
         if (r.cpl !== null && r.cpl !== undefined) {
           var t = maxCpl === minCpl ? 0.5 : (r.cpl - minCpl) / (maxCpl - minCpl);
           var idx = Math.round(t * (RAMP.length - 1));
@@ -338,13 +397,13 @@
   }
 
   // ---------------------------------------------------------------------
-  // Bootstrap
+  // Bootstrap (chamado pelo loader em index.html apos data-*.js carregarem)
   // ---------------------------------------------------------------------
   function renderError(message) {
     var page = document.querySelector('.page');
     page.innerHTML = '';
     page.appendChild(el('div', { class: 'panel', html:
-      '<h2>Dados indisponíveis</h2><p class="panel-hint">' + message + '</p>' }));
+      '<h2>Erro ao montar o dashboard</h2><p class="panel-hint">' + message + '</p>' }));
   }
 
   function formatPeriodo(p) {
@@ -358,31 +417,34 @@
     } catch (e) { return iso; }
   }
 
-  function init() {
-    if (typeof window.DASHBOARD_DATA === 'undefined') {
-      renderError('data.js não foi carregado. Este arquivo é gerado pelo build automático (Meta Graph API + planilha) e não é versionado no repositório — rode o workflow "Build & Deploy Dashboard RAL" no GitHub Actions.');
+  window.renderDashboard = function () {
+    if (typeof window.META === 'undefined' || typeof window.DAILY === 'undefined' || typeof window.GRAIN === 'undefined') {
+      renderError('data-meta.js / data-daily.js / data-grain.js nao carregaram corretamente.');
       return;
     }
 
-    var data = window.DASHBOARD_DATA;
-
     try {
-      document.getElementById('meta-periodo').textContent = formatPeriodo(data.periodo);
-      document.getElementById('meta-atualizado').textContent = formatAtualizado(data.gerado_em);
-      document.getElementById('foot-conta').textContent = data.fontes.meta_conta;
+      var meta = window.META;
+      var daily = arr(window.DAILY);
+      var grain = arr(window.GRAIN);
 
-      renderHeadline(data);
-      renderMql(data);
-      renderFunnel(data);
-      renderCards(data);
-      renderBarChart('chart-investimento', data.serie_diaria, 'investimento', fmtCurrency, '');
-      renderLineChart('chart-leads', data.serie_diaria, 'leads', fmtInt, ' leads');
-      renderTabelaOtimizacao(data);
+      document.getElementById('meta-periodo').textContent = formatPeriodo(meta.periodo);
+      document.getElementById('meta-atualizado').textContent = formatAtualizado(meta.gerado_em);
+      document.getElementById('foot-conta').textContent = meta.fontes.meta_conta;
+
+      var totals = computeTotals(daily);
+      var tabelaRows = aggregateGrainByAd(grain);
+
+      renderHeadline(totals);
+      renderMql(totals);
+      renderFunnel(totals);
+      renderCards(totals);
+      renderBarChart('chart-investimento', daily, 'investimento', fmtCurrency, '');
+      renderLineChart('chart-leads', daily, 'leads', fmtInt, ' leads');
+      renderTabelaOtimizacao(tabelaRows);
       initTabs();
     } catch (err) {
       renderError('Erro ao renderizar o dashboard: ' + err.message);
     }
-  }
-
-  document.addEventListener('DOMContentLoaded', init);
+  };
 })();

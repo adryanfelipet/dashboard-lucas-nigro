@@ -75,7 +75,52 @@
 
 <div id="tooltip" class="viz-tooltip" hidden></div>
 
-<script src="data.js"></script>
-<script src="app.js"></script>
+<script>
+// Loader com cache-bust: injeta data-meta.js/data-daily.js/data-grain.js
+// (window.META/DAILY/GRAIN) via <script> tag, sem fetch/XHR. So chama o
+// app depois que os tres globais existirem.
+(function () {
+  var ts = Date.now();
+  var files = ['data-meta.js', 'data-daily.js', 'data-grain.js'];
+  var loaded = 0;
+  var failed = false;
+
+  function showLoadError() {
+    document.addEventListener('DOMContentLoaded', function () {
+      var page = document.querySelector('.page');
+      if (!page) return;
+      page.innerHTML = '<div class="panel"><h2>Dados indisponiveis</h2>' +
+        '<p class="panel-hint">Nao foi possivel carregar data-meta.js / data-daily.js / data-grain.js. ' +
+        'Esses arquivos sao gerados pelo workflow "Build & Deploy Dashboard RAL" no GitHub Actions.</p></div>';
+    });
+  }
+
+  function onFail() {
+    if (failed) return;
+    failed = true;
+    showLoadError();
+  }
+
+  function onLoad() {
+    loaded++;
+    if (failed || loaded < files.length) return;
+    var appScript = document.createElement('script');
+    appScript.src = 'app.js?v=' + ts;
+    appScript.onload = function () {
+      if (window.renderDashboard) { window.renderDashboard(); } else { onFail(); }
+    };
+    appScript.onerror = onFail;
+    document.body.appendChild(appScript);
+  }
+
+  files.forEach(function (file) {
+    var s = document.createElement('script');
+    s.src = file + '?v=' + ts;
+    s.onload = onLoad;
+    s.onerror = onFail;
+    document.head.appendChild(s);
+  });
+})();
+</script>
 </body>
 </html>
