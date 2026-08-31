@@ -143,15 +143,15 @@
 
   function renderHeadline(totals) {
     var host = document.getElementById('headline-tiles');
-    host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'numero-verdade do funil'));
+    host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'número-verdade do funil'));
     host.appendChild(statTile('CPL', fmtCurrency(totals.cpl), 'investimento ÷ leads'));
-    host.appendChild(statTile('Leads (pixel Meta)', fmtInt(totals.leads_pixel), 'referencia — evento Lead'));
+    host.appendChild(statTile('Leads (pixel Meta)', fmtInt(totals.leads_pixel), 'referência — evento Lead'));
   }
 
   function renderMql(totals) {
     var host = document.getElementById('mql-tiles');
     host.appendChild(statTile('Qualificados', fmtInt(totals.qualificados)));
-    host.appendChild(statTile('% Qualificacao', fmtPct(totals.pct_qualificacao), 'qualificados ÷ leads'));
+    host.appendChild(statTile('% Qualificação', fmtPct(totals.pct_qualificacao), 'qualificados ÷ leads'));
   }
 
   function renderCards(totals) {
@@ -419,7 +419,7 @@
 
   window.renderDashboard = function () {
     if (typeof window.META === 'undefined' || typeof window.DAILY === 'undefined' || typeof window.GRAIN === 'undefined') {
-      renderError('data-meta.js / data-daily.js / data-grain.js nao carregaram corretamente.');
+      renderError('data-meta.js / data-daily.js / data-grain.js não carregaram corretamente.');
       return;
     }
 
