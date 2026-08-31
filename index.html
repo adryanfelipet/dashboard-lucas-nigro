@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard RAL — Rumo ao Lucro</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-main">
+      <h1>Rumo ao Lucro (RAL)</h1>
+      <p class="subtitle">Captação de leads — anúncio → landing page → formulário → WhatsApp</p>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-item"><span class="meta-label">Período</span><span id="meta-periodo">—</span></div>
+      <div class="meta-item"><span class="meta-label">Atualizado em</span><span id="meta-atualizado">—</span></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn is-active" id="tab-btn-geral" role="tab" aria-selected="true" aria-controls="tab-geral">Visão Geral</button>
+    <button class="tab-btn" id="tab-btn-trafego" role="tab" aria-selected="false" aria-controls="tab-trafego">Tráfego Pago</button>
+  </nav>
+
+  <main id="tab-geral" class="tab-panel is-active" role="tabpanel" aria-labelledby="tab-btn-geral">
+
+    <section class="kpi-row" id="headline-tiles" aria-label="Indicadores principais"></section>
+
+    <section class="panel">
+      <h2>Qualificação (MQL)</h2>
+      <div class="kpi-row" id="mql-tiles" aria-label="Qualificação de leads"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Funil</h2>
+      <p class="panel-hint">Leads → Qualificados → Vendas</p>
+      <div id="funnel-chart" class="chart-host" aria-label="Gráfico de funil"></div>
+    </section>
+
+  </main>
+
+  <main id="tab-trafego" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-trafego" hidden>
+
+    <section class="kpi-row" id="cards-tiles" aria-label="Cards de mídia"></section>
+
+    <section class="panel two-col">
+      <div>
+        <h2>Investimento diário</h2>
+        <div id="chart-investimento" class="chart-host" aria-label="Gráfico de investimento diário"></div>
+      </div>
+      <div>
+        <h2>Leads diário</h2>
+        <div id="chart-leads" class="chart-host" aria-label="Gráfico de leads diário"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Otimização — Campanha › Conjunto › Anúncio</h2>
+      <p class="panel-hint">Cor de fundo do CPL indica custo por lead (mais escuro = mais caro)</p>
+      <div class="table-scroll">
+        <table id="tabela-otimizacao" class="data-table"></table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Fontes: Meta Ads (conta <span id="foot-conta">—</span>) · Planilha de funil (leitura, não modificada) · Dados agregados/anonimizados.</p>
+  </footer>
+
+</div>
+
+<div id="tooltip" class="viz-tooltip" hidden></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
