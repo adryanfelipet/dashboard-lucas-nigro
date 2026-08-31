@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard RAL — Rumo ao Lucro</title>
 <link rel="stylesheet" href="styles.css">
+<script>
+// Aplica o tema salvo antes do primeiro paint, pra nao "piscar" o tema errado.
+(function () {
+  try {
+    var t = localStorage.getItem('ral-theme');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) { /* localStorage indisponivel - segue o prefers-color-scheme */ }
+})();
+</script>
 </head>
 <body>
 <div class="page">
@@ -15,8 +24,10 @@
       <p class="subtitle">Captação de leads — anúncio → landing page → formulário → WhatsApp</p>
     </div>
     <div class="topbar-meta">
+      <span class="badge tax" id="meta-imposto" title="Imposto do Meta Ads aplicado sobre o gasto bruto">imposto —</span>
       <div class="meta-item"><span class="meta-label">Período</span><span id="meta-periodo">—</span></div>
       <div class="meta-item"><span class="meta-label">Atualizado em</span><span id="meta-atualizado">—</span></div>
+      <button class="icon-btn" id="theme-btn" title="Alternar tema claro/escuro">Escuro</button>
     </div>
   </header>
 
@@ -24,6 +35,29 @@
     <button class="tab-btn is-active" id="tab-btn-geral" role="tab" aria-selected="true" aria-controls="tab-geral">Visão Geral</button>
     <button class="tab-btn" id="tab-btn-trafego" role="tab" aria-selected="false" aria-controls="tab-trafego">Tráfego Pago</button>
   </nav>
+
+  <div class="controls">
+    <div class="grp">
+      <label>Período</label>
+      <button class="btn" data-preset="today">Hoje</button>
+      <button class="btn" data-preset="yesterday">Ontem</button>
+      <button class="btn" data-preset="7">7 dias</button>
+      <button class="btn" data-preset="14">14 dias</button>
+      <button class="btn" data-preset="30">30 dias</button>
+      <button class="btn" data-preset="month">Este mês</button>
+      <button class="btn" data-preset="all">Tudo</button>
+    </div>
+    <div class="grp">
+      <input type="date" id="from">
+      <span class="sep">até</span>
+      <input type="date" id="to">
+    </div>
+    <div class="spacer"></div>
+    <div class="grp">
+      <button class="btn" id="cmp" aria-pressed="false">Comparar c/ período anterior</button>
+      <span class="rangelbl" id="cmpNote"></span>
+    </div>
+  </div>
 
   <main id="tab-geral" class="tab-panel is-active" role="tabpanel" aria-labelledby="tab-btn-geral">
 

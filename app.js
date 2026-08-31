@@ -2,11 +2,10 @@
   'use strict';
 
   var SVGNS = 'http://www.w3.org/2000/svg';
-  var RAMP = [
-    '#cde2fb', '#b7d3f6', '#9ec5f4', '#86b6ef', '#6da7ec',
-    '#5598e7', '#3987e5', '#2a78d6', '#256abf', '#1c5cab',
-    '#184f95', '#104281', '#0d366b'
-  ];
+
+  // Estado do filtro de periodo (preenchido em window.renderDashboard).
+  var STATE = { from: null, to: null, preset: 'month', compare: false };
+  var ALL_DAILY = [], ALL_GRAIN = [], minDate = null, maxDate = null;
 
   // PS 5.1 (ConvertTo-Json) as vezes colapsa array de 1 item em escalar.
   // arr() normaliza qualquer valor de window.DAILY/window.GRAIN para array.
@@ -117,49 +116,70 @@
   // ---------------------------------------------------------------------
   // Stat tiles
   // ---------------------------------------------------------------------
-  function statTile(label, value, sub) {
+  function statTile(label, value, sub, deltaHtml) {
     var children = [
       el('div', { class: 'stat-label', text: label }),
       el('div', { class: 'stat-value', text: value })
     ];
-    if (sub) children.push(el('div', { class: 'stat-sub', text: sub }));
+    if (sub || deltaHtml) {
+      var subEl = el('div', { class: 'stat-sub' });
+      if (deltaHtml) subEl.innerHTML = deltaHtml;
+      if (sub) subEl.appendChild(document.createTextNode(sub));
+      children.push(subEl);
+    }
     return el('div', { class: 'stat-tile' }, children);
   }
 
-  function renderHeadline(totals) {
+  // Indicador de variacao vs periodo anterior (so aparece com STATE.compare ligado).
+  // better=true: subir e bom (verde). better=false: subir e ruim (vermelho). null: neutro (cinza).
+  function miniDelta(cur, prev, better) {
+    if (!STATE.compare || !okNum(prev) || prev === 0 || !okNum(cur)) return '';
+    var ch = (cur - prev) / Math.abs(prev);
+    var arrow = Math.abs(ch) < 0.0005 ? '→' : (ch > 0 ? '▲' : '▼');
+    var cls;
+    if (better === null) { cls = 'flat'; }
+    else {
+      var bad = better === false;
+      cls = Math.abs(ch) < 0.0005 ? 'flat' : (((ch > 0) !== bad) ? 'up' : 'down');
+    }
+    var pctTxt = Math.abs(ch * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return '<span class="delta ' + cls + '">' + arrow + ' ' + pctTxt + '%</span> ';
+  }
+
+  function renderHeadline(totals, prev) {
     var host = document.getElementById('headline-tiles');
-    host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'número-verdade do funil, únicos por email'));
-    host.appendChild(statTile('CPL', fmtCurrency(totals.cpl), 'investimento ÷ leads'));
-    host.appendChild(statTile('Leads (pixel Meta)', fmtInt(totals.leads_pixel), 'referência — evento Lead'));
+    host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'número-verdade do funil, únicos por email', miniDelta(totals.leads, prev && prev.leads, true)));
+    host.appendChild(statTile('CPL', fmtCurrency(totals.cpl), 'investimento ÷ leads', miniDelta(totals.cpl, prev && prev.cpl, false)));
+    host.appendChild(statTile('Leads (pixel Meta)', fmtInt(totals.leads_pixel), 'referência — evento Lead', miniDelta(totals.leads_pixel, prev && prev.leads_pixel, null)));
   }
 
-  function renderMql(totals) {
+  function renderMql(totals, prev) {
     var host = document.getElementById('mql-tiles');
-    host.appendChild(statTile('Qualificados', fmtInt(totals.qualificados)));
-    host.appendChild(statTile('% Qualificação', fmtPct(totals.pct_qualificacao), 'qualificados ÷ leads'));
+    host.appendChild(statTile('Qualificados', fmtInt(totals.qualificados), null, miniDelta(totals.qualificados, prev && prev.qualificados, true)));
+    host.appendChild(statTile('% Qualificação', fmtPct(totals.pct_qualificacao), 'qualificados ÷ leads', miniDelta(totals.pct_qualificacao, prev && prev.pct_qualificacao, true)));
   }
 
-  function renderCards(totals) {
+  function renderCards(totals, prev) {
     var host = document.getElementById('cards-tiles');
-    host.appendChild(statTile('Investimento', fmtCurrency(totals.investimento), 'com imposto (x1,1385)'));
-    host.appendChild(statTile('CPM', fmtCurrency(totals.cpm)));
-    host.appendChild(statTile('CTR (link)', fmtPct(totals.ctr_link, 2)));
-    host.appendChild(statTile('CPC', fmtCurrency(totals.cpc)));
-    host.appendChild(statTile('Cliques', fmtInt(totals.cliques), 'cliques no link'));
-    host.appendChild(statTile('Leads', fmtInt(totals.leads)));
-    host.appendChild(statTile('CPL', fmtCurrency(totals.cpl)));
-    host.appendChild(statTile('Clique → Lead', fmtPct(totals.clique_lead_pct, 2)));
+    host.appendChild(statTile('Investimento', fmtCurrency(totals.investimento), 'com imposto (x1,1385)', miniDelta(totals.investimento, prev && prev.investimento, null)));
+    host.appendChild(statTile('CPM', fmtCurrency(totals.cpm), null, miniDelta(totals.cpm, prev && prev.cpm, false)));
+    host.appendChild(statTile('CTR (link)', fmtPct(totals.ctr_link, 2), null, miniDelta(totals.ctr_link, prev && prev.ctr_link, true)));
+    host.appendChild(statTile('CPC', fmtCurrency(totals.cpc), null, miniDelta(totals.cpc, prev && prev.cpc, false)));
+    host.appendChild(statTile('Cliques', fmtInt(totals.cliques), 'cliques no link', miniDelta(totals.cliques, prev && prev.cliques, true)));
+    host.appendChild(statTile('Leads', fmtInt(totals.leads), null, miniDelta(totals.leads, prev && prev.leads, true)));
+    host.appendChild(statTile('CPL', fmtCurrency(totals.cpl), null, miniDelta(totals.cpl, prev && prev.cpl, false)));
+    host.appendChild(statTile('Clique → Lead', fmtPct(totals.clique_lead_pct, 2), null, miniDelta(totals.clique_lead_pct, prev && prev.clique_lead_pct, true)));
   }
 
   // ---------------------------------------------------------------------
   // Funil completo (5 etapas): Impressoes -> Cliques -> Leads -> MQL -> Vendas
   // ---------------------------------------------------------------------
   var STAGE_COLORS = [
-    { bg: '#86b6ef', ink: '#0b0b0b' },
-    { bg: '#5598e7', ink: '#0b0b0b' },
-    { bg: '#2a78d6', ink: '#ffffff' },
-    { bg: '#1c5cab', ink: '#ffffff' },
-    { bg: '#104281', ink: '#ffffff' }
+    { bg: 'color-mix(in srgb, var(--brand) 28%, var(--card))', ink: 'var(--ink-1)' },
+    { bg: 'color-mix(in srgb, var(--brand) 48%, var(--card))', ink: 'var(--ink-1)' },
+    { bg: 'color-mix(in srgb, var(--brand) 68%, var(--card))', ink: 'var(--brand-ink)' },
+    { bg: 'color-mix(in srgb, var(--brand) 86%, var(--card))', ink: 'var(--brand-ink)' },
+    { bg: 'var(--brand)', ink: 'var(--brand-ink)' }
   ];
 
   function renderFunnel(totals) {
@@ -297,21 +317,21 @@
 
   function renderComboCharts(daily) {
     document.getElementById('legA').innerHTML = legendHTML([
-      { name: 'Investimento c/ imposto', color: 'var(--series-blue)' },
+      { name: 'Investimento c/ imposto', color: 'var(--brand)' },
       { name: 'Leads (eixo dir.)', color: 'var(--series-2)' }
     ]);
     comboChart(document.getElementById('chA'), daily, {
-      bars: [{ key: 'investimento', color: 'var(--series-blue)', name: 'Investimento c/ imposto' }],
+      bars: [{ key: 'investimento', color: 'var(--brand)', name: 'Investimento c/ imposto' }],
       line: { key: 'leads', color: 'var(--series-2)', name: 'Leads' },
       leftFmt: fmtCurrency, rightFmt: fmtInt, lineFmt: fmtInt
     });
 
     document.getElementById('legB').innerHTML = legendHTML([
-      { name: 'Leads', color: 'var(--series-blue)' },
+      { name: 'Leads', color: 'var(--brand)' },
       { name: 'Custo por lead (eixo dir.)', color: 'var(--series-2)' }
     ]);
     comboChart(document.getElementById('chB'), daily, {
-      bars: [{ key: 'leads', color: 'var(--series-blue)', name: 'Leads' }],
+      bars: [{ key: 'leads', color: 'var(--brand)', name: 'Leads' }],
       line: { key: 'cpl', color: 'var(--series-2)', name: 'Custo/lead' },
       leftFmt: fmtInt, rightFmt: fmtCurrency, lineFmt: fmtCurrency
     });
@@ -385,7 +405,7 @@
     if (s.dir === 'low') t = 1 - t;
     if (t < 0.15) return '';
     var pct = Math.round(t * 32);
-    return 'background:color-mix(in srgb, var(--series-blue) ' + pct + '%, transparent)';
+    return 'background:color-mix(in srgb, var(--brand) ' + pct + '%, transparent)';
   }
 
   function sortNodes(list) { return list.slice().sort(function (a, b) { return b.investimento - a.investimento; }); }
@@ -492,6 +512,121 @@
   }
 
   // ---------------------------------------------------------------------
+  // Tema claro/escuro (manual, com persistencia)
+  // ---------------------------------------------------------------------
+  function initTheme() {
+    var btn = document.getElementById('theme-btn');
+    function current() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark' || attr === 'light') return attr;
+      return (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    function apply(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      btn.textContent = t === 'dark' ? 'Claro' : 'Escuro';
+      try { localStorage.setItem('ral-theme', t); } catch (e) { /* sem storage disponivel */ }
+    }
+    apply(current());
+    btn.addEventListener('click', function () { apply(current() === 'dark' ? 'light' : 'dark'); });
+  }
+
+  // ---------------------------------------------------------------------
+  // Filtro de periodo (presets, datas, comparar c/ periodo anterior)
+  // ---------------------------------------------------------------------
+  function dayAdd(ds, n) {
+    var p = ds.split('-');
+    var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    dt.setUTCDate(dt.getUTCDate() + n);
+    return dt.toISOString().slice(0, 10);
+  }
+  function diffDays(a, b) { return Math.round((new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z')) / 864e5); }
+  function firstOfMonth(ds) { return ds.slice(0, 7) + '-01'; }
+  function clampD(ds) { return ds < minDate ? minDate : (ds > maxDate ? maxDate : ds); }
+  function within(d, from, to) { return d >= from && d <= to; }
+  function filterDaily(from, to) { return ALL_DAILY.filter(function (d) { return within(d.data, from, to); }); }
+  function filterGrain(from, to) { return ALL_GRAIN.filter(function (g) { return within(g.data, from, to); }); }
+
+  function setPeriod(from, to, preset) {
+    STATE.from = clampD(from);
+    STATE.to = clampD(to);
+    STATE.preset = preset || 'custom';
+    document.getElementById('from').value = STATE.from;
+    document.getElementById('to').value = STATE.to;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.preset === STATE.preset));
+    });
+    refresh();
+  }
+
+  function initPeriodControls() {
+    var fromInput = document.getElementById('from'), toInput = document.getElementById('to');
+    fromInput.min = toInput.min = minDate;
+    fromInput.max = toInput.max = maxDate;
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
+      b.addEventListener('click', function () {
+        var p = b.dataset.preset;
+        if (p === 'all') return setPeriod(minDate, maxDate, 'all');
+        if (p === 'today') return setPeriod(maxDate, maxDate, 'today');
+        if (p === 'yesterday') { var y = dayAdd(maxDate, -1); return setPeriod(y, y, 'yesterday'); }
+        if (p === 'month') return setPeriod(firstOfMonth(maxDate), maxDate, 'month');
+        var n = +p;
+        return setPeriod(dayAdd(maxDate, -(n - 1)), maxDate, p);
+      });
+    });
+
+    function clampDates() {
+      var f = fromInput.value, t = toInput.value;
+      if (!f || !t) return;
+      if (f > t) { var tmp = f; f = t; t = tmp; }
+      setPeriod(f, t, 'custom');
+    }
+    fromInput.addEventListener('change', clampDates);
+    toInput.addEventListener('change', clampDates);
+
+    var cmpBtn = document.getElementById('cmp');
+    cmpBtn.addEventListener('click', function () {
+      STATE.compare = !STATE.compare;
+      cmpBtn.classList.toggle('on', STATE.compare);
+      cmpBtn.setAttribute('aria-pressed', String(STATE.compare));
+      refresh();
+    });
+  }
+
+  function refresh() {
+    var len = diffDays(STATE.from, STATE.to) + 1;
+    var daily = filterDaily(STATE.from, STATE.to);
+    var grain = filterGrain(STATE.from, STATE.to);
+    var totals = computeTotals(daily);
+
+    var prevTotals = null;
+    if (STATE.compare) {
+      var pTo = dayAdd(STATE.from, -1);
+      var pFrom = dayAdd(pTo, -(len - 1));
+      prevTotals = computeTotals(filterDaily(pFrom, pTo));
+    }
+
+    var cmpNote = document.getElementById('cmpNote');
+    if (STATE.compare) {
+      var pTo2 = dayAdd(STATE.from, -1), pFrom2 = dayAdd(pTo2, -(len - 1));
+      cmpNote.textContent = 'comparando com ' + fmtDateFull(pFrom2) + ' – ' + fmtDateFull(pTo2) + ' (' + len + (len > 1 ? ' dias' : ' dia') + ')';
+    } else {
+      cmpNote.textContent = len + (len > 1 ? ' dias selecionados' : ' dia selecionado');
+    }
+
+    document.getElementById('headline-tiles').innerHTML = '';
+    document.getElementById('mql-tiles').innerHTML = '';
+    document.getElementById('cards-tiles').innerHTML = '';
+
+    renderHeadline(totals, prevTotals);
+    renderMql(totals, prevTotals);
+    renderFunnel(totals);
+    renderComboCharts(daily);
+    renderCards(totals, prevTotals);
+    renderOtimizacao(grain);
+  }
+
+  // ---------------------------------------------------------------------
   // Bootstrap (chamado pelo loader em index.html apos data-*.js carregarem)
   // ---------------------------------------------------------------------
   function renderError(message) {
@@ -521,22 +656,21 @@
 
     try {
       var meta = window.META;
-      var daily = arr(window.DAILY).slice().sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
-      var grain = arr(window.GRAIN);
+      ALL_DAILY = arr(window.DAILY).slice().sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
+      ALL_GRAIN = arr(window.GRAIN);
 
       document.getElementById('meta-periodo').textContent = formatPeriodo(meta.periodo);
       document.getElementById('meta-atualizado').textContent = formatAtualizado(meta.gerado_em);
+      document.getElementById('meta-imposto').textContent = 'imposto ×' + String(meta.imposto || 1.1385).replace('.', ',');
       document.getElementById('foot-conta').textContent = meta.fontes.meta_conta;
 
-      var totals = computeTotals(daily);
+      minDate = ALL_DAILY.length ? ALL_DAILY[0].data : meta.periodo.inicio;
+      maxDate = ALL_DAILY.length ? ALL_DAILY[ALL_DAILY.length - 1].data : meta.periodo.fim;
 
-      renderHeadline(totals);
-      renderMql(totals);
-      renderFunnel(totals);
-      renderComboCharts(daily);
-      renderCards(totals);
-      renderOtimizacao(grain);
+      initTheme();
       initTabs();
+      initPeriodControls();
+      setPeriod(firstOfMonth(maxDate), maxDate, 'month');
     } catch (err) {
       renderError('Erro ao renderizar o dashboard: ' + err.message);
     }
