@@ -1,5 +1,5 @@
 ﻿window.META = {
-    "gerado_em":  "2026-08-31T08:29:54Z",
+    "gerado_em":  "2026-08-31T08:50:48Z",
     "cliente":  "Lucas Nigro - Rumo ao Lucro (RAL)",
     "periodo":  {
                     "inicio":  "2026-08-28",

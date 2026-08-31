@@ -46,17 +46,17 @@
     },
     {
         "data":  "2026-08-31",
-        "investimento":  4.28,
-        "impressoes":  90,
-        "cliques":  1,
+        "investimento":  4.41,
+        "impressoes":  95,
+        "cliques":  3,
         "leads_pixel":  4,
         "leads":  1,
         "qualificados":  1,
         "vendas":  0,
-        "cpm":  47.56,
-        "cpc":  4.28,
-        "ctr_link":  1.11,
-        "cpl":  4.28,
-        "clique_lead_pct":  100
+        "cpm":  46.42,
+        "cpc":  1.47,
+        "ctr_link":  3.16,
+        "cpl":  4.41,
+        "clique_lead_pct":  33.33
     }
 ];

@@ -116,14 +116,14 @@
         "campanha":  "RAL | E2-CAP | P2-FRIO | LEAD | CBO | 2026-08-28 | LAL",
         "conjunto":  "AUTO | ALL | 25 a 54 | BR | LAL 1% Seguidores",
         "anuncio":  "AD02-RAL-V1",
-        "investimento":  4.28,
-        "impressoes":  90,
-        "cliques":  1,
+        "investimento":  4.41,
+        "impressoes":  95,
+        "cliques":  3,
         "leads":  1,
-        "cpm":  47.56,
-        "cpc":  4.28,
-        "ctr":  1.11,
-        "cpl":  4.28
+        "cpm":  46.42,
+        "cpc":  1.47,
+        "ctr":  3.16,
+        "cpl":  4.41
     },
     {
         "data":  "2026-08-28",
