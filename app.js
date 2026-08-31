@@ -150,7 +150,6 @@
     var host = document.getElementById('headline-tiles');
     host.appendChild(statTile('Leads (planilha)', fmtInt(totals.leads), 'número-verdade do funil, únicos por email', miniDelta(totals.leads, prev && prev.leads, true)));
     host.appendChild(statTile('CPL', fmtCurrency(totals.cpl), 'investimento ÷ leads', miniDelta(totals.cpl, prev && prev.cpl, false)));
-    host.appendChild(statTile('Leads (pixel Meta)', fmtInt(totals.leads_pixel), 'referência — evento Lead', miniDelta(totals.leads_pixel, prev && prev.leads_pixel, null)));
   }
 
   function renderMql(totals, prev) {
